@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Paper from "@material-ui/core/Paper";
 import Navbar from "../components/Navbar";
 import CustomizedInputBase from "../components/Search";
@@ -15,6 +15,8 @@ import { MapContainer } from "../components/map";
 import Button from "@material-ui/core/Button";
 import { useStyles } from "../components/Styles";
 import Loader from "../components/Loader";
+import jsPDF from "jspdf";
+import axios from "axios";
 
 const columns = [
   { id: "id", label: "Universal ID", minWidth: 170 },
@@ -51,29 +53,38 @@ export default function Explorer(props) {
   const [open, setOpen] = React.useState(false);
   const [openRecipt, setOpenRecipt] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = useState(null);
+  const [allData, setAllData] = useState(null);
+  const [mAddress, setMAddress] = useState('');
+  const [tAddress, setTAddress] = useState('');
+  const [dAddress, setDAddress] = useState('');
+  const [hasRendered, setHasRendered] = useState(false);
+  // const 
+  // const[d1234,setD1234]=useState('');
 
   const findProduct = async (search) => {
-    var arr = [];
-    var temp = [];
+    let arr = [];
+    let temp = [];
     setLoading(true);
     try {
       setProductData([]);
       setProductHistory([]);
-      var a = await supplyChainContract.methods
+      let a = await supplyChainContract.methods
         .fetchProductPart1(parseInt(search), "product", 0)
         .call();
-      var b = await supplyChainContract.methods
+      let b = await supplyChainContract.methods
         .fetchProductPart2(parseInt(search), "product", 0)
         .call();
-      var c = await supplyChainContract.methods
+      let c = await supplyChainContract.methods
         .fetchProductPart3(parseInt(search), "product", 0)
         .call();
       temp.push(a);
       temp.push(b);
       temp.push(c);
       setProductData(temp);
-      arr = [];
-      var l = await supplyChainContract.methods
+      console.log(temp);
+
+      let l = await supplyChainContract.methods
         .fetchProductHistoryLength(parseInt(search))
         .call();
 
@@ -117,6 +128,146 @@ export default function Explorer(props) {
     });
   };
 
+  const getQrCode = async () => {
+    try {
+      const res = await fetch(
+        `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${allData}`
+      );
+      const doc = new jsPDF("p", "px", "a4");
+      const image = new Image();
+      image.src = res.url;
+      doc.addImage(image, "PNG", 140, 120, 150, 150);
+      doc.save("QRcode.pdf");
+    } catch (e) {
+      console.log(e);
+      setError(e);
+    }
+  };
+  const fetchAddressApi1 = async (options1) => {
+    try {
+      const ManuResponse = await axios.request(options1);
+      setMAddress(ManuResponse.data.results[0].address);
+      console.log(ManuResponse.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  const fetchAddressApi2 = async (options2) => {
+    try {
+      setTimeout(async()=>{
+        const ThirdResponse = await axios.request(options2);
+        setTAddress(ThirdResponse.data.results[0].address);
+        console.log(ThirdResponse.data)
+      },5000);
+
+    } catch (error) {
+
+      console.log(error);
+    }
+  };
+  const fetchAddressApi3 = async (options3) => {
+    try {
+      setTimeout(async()=>{
+        const DelryResponse = await axios.request(options3);
+        setDAddress(DelryResponse.data.results[0].address);
+        console.log(DelryResponse.data);
+      },10000)
+
+    } catch (error) {
+ 
+      console.log(error);
+    }
+  };
+
+  const getREsponse = (options1,options2,options3) => {
+    fetchAddressApi1(options1);
+    fetchAddressApi2(options2);
+    fetchAddressApi3(options3);
+  };  
+  const handdleSetData = () => {
+    const options1 = {
+      method: "GET",
+      url: "https://trueway-geocoding.p.rapidapi.com/ReverseGeocode",
+      params: {
+        location: `${productData[0][6]},${productData[0][7]}`,
+        // location: '77.1025,28.7041',
+        language: "en",
+      },
+      headers: {
+        "X-RapidAPI-Key": "e35459bf2dmshd8260396c07ed4cp1c8aa3jsncf7b2fb94776",
+        "X-RapidAPI-Host": "trueway-geocoding.p.rapidapi.com",
+      },
+    };
+    const options2 = {
+      method: "GET",
+      url: "https://trueway-geocoding.p.rapidapi.com/ReverseGeocode",
+      params: {
+        location: `${productData[1][7]},${productData[2][0]}`,
+        // location: '77.1025,28.7041',
+        language: "en",
+      },
+      headers: {
+        "X-RapidAPI-Key": "e35459bf2dmshd8260396c07ed4cp1c8aa3jsncf7b2fb94776",
+        "X-RapidAPI-Host": "trueway-geocoding.p.rapidapi.com",
+      },
+    };
+    const options3 = {
+      method: "GET",
+      url: "https://trueway-geocoding.p.rapidapi.com/ReverseGeocode",
+      params: {
+        location: `${productData[2][2]},${productData[2][3]}`,
+        // location: '77.1025,28.7041',
+        language: "en",
+      },
+      headers: {
+        "X-RapidAPI-Key": "e35459bf2dmshd8260396c07ed4cp1c8aa3jsncf7b2fb94776",
+        "X-RapidAPI-Host": "trueway-geocoding.p.rapidapi.com",
+      },
+    };
+    getREsponse(options1,options2,options3);
+  };
+
+  // const handleSetAllData=()=>{
+  //   // alert(tAddress);
+  //   setAllData([
+  //     "Product Name: " + productData[1][1],
+  //     "Product Price: " + productData[1][3],
+  //     "Product Category: " + productData[1][4],
+  //     "Manufacturer Name: " + productData[0][4],
+  //     "Manufacture Details: " + productData[0][5],
+  //     "Manufacture address: " + mAddress,
+  //     "Third Party Location: "+ tAddress,
+  //     "Delivery Hub Location: "+ dAddress,
+      
+  //   ]);
+  //   // console.log(tAddress);
+  // }
+
+  useEffect(()=>{
+    if (hasRendered) {
+      if(productData.length!==0){
+        handdleSetData();
+      }
+    }else{
+      setHasRendered(true);
+    }
+  },[productData]);
+  
+useEffect(()=>{
+  if(productData.length!==0){
+
+    setAllData([
+      "Product Name: " + productData[1][1],
+      "Product Price: " + productData[1][3],
+      "Product Category: " + productData[1][4],
+      "Manufacturer Name: " + productData[0][4],
+      "Manufacture Details: " + productData[0][5],
+      "Manufacture Location: " + mAddress,
+      "Third Party Location: "+ tAddress,
+      "Delivery Hub Location: "+ dAddress,
+    ]);
+  }
+},[mAddress,tAddress,dAddress])
   return (
     <>
       <Navbar navItems={navItem}>
@@ -138,6 +289,7 @@ export default function Explorer(props) {
             <CustomizedInputBase findProduct={findProduct} />
             {productData.length !== 0 ? (
               <>
+                <></>
                 <Grid container className={classes.Explorerroot} spacing={3}>
                   <Grid item xs={6}>
                     <Paper className={classes.ProductPaper}>
@@ -183,11 +335,20 @@ export default function Explorer(props) {
                     </Paper>
                   </Grid>
                   <Grid item xs={6} style={{ position: "relative" }}>
-                    <MapContainer prodData={productData} />
+                    <MapContainer prodData={productData} mAddress={mAddress} tAddress={tAddress} dAddress={dAddress} />
                   </Grid>
                 </Grid>
                 <br />
-                <h2 className={classes.tableCount}> Product History</h2>
+                <div style={{ display: "flex" }}>
+                  <h2 className={classes.tableCount}> Product History</h2>
+                  <button
+                    onClick={getQrCode}
+                    className="btn"
+                    style={{ background: "#20247c", color: "#fbfbfd" }}
+                  >
+                    Download QR Code
+                  </button>
+                </div>
                 <Paper className={classes.TableRoot2}>
                   <TableContainer className={classes.TableContainer}>
                     <Table stickyHeader aria-label="sticky table">
@@ -220,9 +381,7 @@ export default function Explorer(props) {
                       <TableBody>
                         {productHistory.length !== 0 ? (
                           productHistory.map((row) => {
-                            console.log(row[1][0]);
                             const d = new Date(parseInt(row[1][0] * 1000));
-                            console.log(JSON.stringify(d));
                             return (
                               <TableRow
                                 hover
